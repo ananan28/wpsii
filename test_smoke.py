@@ -6,6 +6,7 @@ from haituo_qt import MainWindow
 app = QApplication([])
 w = MainWindow()
 s = w.sheet()
+s.setRowCount(3)
 s.write_cell(0,0,"B")
 s.write_cell(1,0,"A")
 s.write_cell(2,0,"A")
@@ -16,5 +17,6 @@ assert s.item(0,0).background().color().name() == "#ffe6a8"
 assert s.item(1,0).background().color().name() == "#ffe6a8"
 w.clear_duplicate_highlights()
 assert s.item(0,0).background().color().name() == "#ffffff"
+w.dirty = False
 w.close()
 print("Basic UI sorting and duplicate highlighting smoke tests passed")
