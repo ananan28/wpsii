@@ -1,6 +1,7 @@
 import csv
 import os
 import sys
+import secrets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QColor, QFont, QKeySequence
 from PySide6.QtWidgets import (
@@ -82,7 +83,7 @@ class Sheet(QTableWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("海拓表格 1.2 — 未命名")
+        self.setWindowTitle("海拓表格 1.3 — 未命名")
         self.resize(1450, 850)
         self.path = None
         self.dirty = False
@@ -137,6 +138,10 @@ class MainWindow(QMainWindow):
         action("粘贴", self.paste, "Ctrl+V", edit_menu)
         action("剪切", self.cut, "Ctrl+X", edit_menu)
         action("查找", self.find_next, "Ctrl+F", edit_menu)
+        action("批量查找替换", self.replace_all, "Ctrl+H", edit_menu)
+        action("高亮重复项", self.highlight_duplicates, None, data_menu)
+        action("取消重复项高亮", self.clear_duplicate_highlights, None, data_menu)
+        action("随机填充选中区域", self.random_fill, None, data_menu)
         action("新增工作表", self.add_sheet, "Shift+F11", data_menu)
         action("插入行", self.insert_row, None, data_menu)
         action("删除行", self.delete_row, None, data_menu)
@@ -167,7 +172,8 @@ class MainWindow(QMainWindow):
             ("清除筛选", self.clear_filters), ("自动列宽", self.fit_columns),
             ("列宽", self.set_column_width), ("行高", self.set_row_height),
             ("增加行", self.add_rows), ("增加列", self.add_columns),
-            ("去重", self.dedupe)
+            ("去重", self.dedupe), ("重复项", self.highlight_duplicates),
+            ("替换", self.replace_all), ("随机填充", self.random_fill)
         ]:
             bar.addAction(label, func)
         bar.addSeparator()
@@ -400,6 +406,84 @@ class MainWindow(QMainWindow):
     def select_column(self):
         self.sheet().selectColumn(max(0, self.sheet().currentColumn()))
 
+
+    def replace_all(self):
+        sheet = self.sheet()
+        target, ok = QInputDialog.getText(self, "批量替换", "查找文字（区分大小写）：")
+        if not ok or not target:
+            return
+        replacement, ok = QInputDialog.getText(self, "批量替换", "替换为（可留空）：")
+        if not ok:
+            return
+        candidates = self.chosen_items() if self.chosen_items() else list(sheet.findItems(target, Qt.MatchContains))
+        affected = 0
+        for item in candidates:
+            old = item.text()
+            if target in old:
+                item.setText(old.replace(target, replacement))
+                affected += 1
+        self.statusBar().showMessage(f"已替换 {affected} 个单元格")
+        QMessageBox.information(self, "替换完成", f"已修改 {affected} 个单元格。")
+
+    def highlight_duplicates(self):
+        sheet = self.sheet()
+        column = max(0, sheet.currentColumn())
+        seen = {}
+        duplicates = []
+        for row in range(sheet.rowCount()):
+            key = sheet.text_at(row, column).strip().casefold()
+            if not key:
+                continue
+            if key in seen:
+                duplicates.append(seen[key])
+                duplicates.append(row)
+            else:
+                seen[key] = row
+        color = QColor("#ffe6a8")
+        for row in set(duplicates):
+            item = sheet.item(row, column)
+            if item:
+                item.setBackground(color)
+        self.dirty = bool(duplicates) or self.dirty
+        self.statusBar().showMessage(f"{col_name(column)} 列发现 {len(set(duplicates))} 个重复值单元格（包含首次出现）")
+
+    def clear_duplicate_highlights(self):
+        sheet = self.sheet()
+        col = max(0, sheet.currentColumn())
+        for row in range(sheet.rowCount()):
+            item = sheet.item(row, col)
+            if item:
+                item.setBackground(QColor("white"))
+        self.dirty = True
+
+    def random_fill(self):
+        sheet = self.sheet()
+        bounds = self.selection_bounds()
+        if not bounds:
+            QMessageBox.information(self, "随机填充", "请先选择需要填充的区域")
+            return
+        r1, c1, r2, c2 = bounds
+        if (r2-r1+1)*(c2-c1+1)>100000:
+            QMessageBox.warning(self, "随机填充", "每次最多填充 100,000 个单元格")
+            return
+        low, ok = QInputDialog.getInt(self, "随机填充", "随机整数下限", 1, -1000000000, 1000000000)
+        if not ok:
+            return
+        high, ok = QInputDialog.getInt(self, "随机填充", "随机整数上限", 100, low, 1000000000)
+        if not ok:
+            return
+        if QMessageBox.question(self, "确认覆盖", f"将用随机整数覆盖 {((r2-r1+1)*(c2-c1+1)):,} 个单元格，确定继续？") != QMessageBox.Yes:
+            return
+        sheet.setUpdatesEnabled(False)
+        try:
+            for row in range(r1, r2+1):
+                for col in range(c1, c2+1):
+                    sheet.write_cell(row, col, low + secrets.randbelow(high-low+1))
+        finally:
+            sheet.setUpdatesEnabled(True)
+        self.dirty = True
+        self.statusBar().showMessage("随机填充完成")
+
     def dedupe(self):
         sheet = self.sheet()
         col = max(0, sheet.currentColumn())
@@ -440,7 +524,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.dirty = False
         self.add_sheet()
-        self.setWindowTitle("海拓表格 1.2 — 未命名")
+        self.setWindowTitle("海拓表格 1.3 — 未命名")
 
     def open_file(self):
         if not self.maybe_save():
@@ -494,7 +578,7 @@ class MainWindow(QMainWindow):
                 self.add_sheet()
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.2 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.3 — " + os.path.basename(path))
             self.statusBar().showMessage("已打开：" + path)
         except Exception as e:
             QMessageBox.critical(self, "打开失败", str(e))
@@ -542,7 +626,7 @@ class MainWindow(QMainWindow):
                         writer.writerow([sheet.text_at(r, c) for c in range(sheet.columnCount())])
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.2 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.3 — " + os.path.basename(path))
             self.statusBar().showMessage("已保存：" + path)
             return True
         except Exception as e:
