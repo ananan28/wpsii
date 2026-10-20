@@ -17,7 +17,11 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Check Python syntax
         run: python -m py_compile haituo_qt.py
-      - name: Smoke test core UI\n        env:\n          QT_QPA_PLATFORM: offscreen\n        run: python test_smoke.py\n      - name: Build standalone Qt EXE
+      - name: Smoke test core UI
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python test_smoke.py
+      - name: Build standalone Qt EXE
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name HaituoTable haituo_qt.py
       - name: Install NSIS
         run: choco install nsis --yes --no-progress
