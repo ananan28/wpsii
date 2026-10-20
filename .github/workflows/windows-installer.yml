@@ -31,6 +31,6 @@ jobs:
           & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" installer.nsi
       - uses: actions/upload-artifact@v4
         with:
-          name: HaituoTable-v1.3-Windows-Installer
-          path: HaituoTable_Setup_v1.3.0_Win64.exe
+          name: HaituoTable-v1.4-Windows-Installer
+          path: HaituoTable_Setup_v1.4.0_Win64.exe
           if-no-files-found: error
