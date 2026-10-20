@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 INITIAL_ROWS = 200
 INITIAL_COLS = 26
 MAX_VISIBLE_ROWS = 100000
-MAX_VISIBLE_COLS = 256
+MAX_VISIBLE_COLS = 16384
 
 def col_name(i):
     s = ""
@@ -34,6 +34,20 @@ class Sheet(QTableWidget):
         self.setSelectionMode(QTableWidget.ContiguousSelection)
         self.setStyleSheet("QTableWidget { background: #ffffff; gridline-color: #dfe4e9; selection-background-color: #c9e6d6; selection-color: #16251d; } QHeaderView::section { background: #f1f3f5; border: 0; border-right: 1px solid #d6dbe0; border-bottom: 1px solid #d6dbe0; padding: 5px; color: #35434c; }")
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setMinimumSectionSize(25)
+        self.verticalHeader().setMinimumSectionSize(18)
+        self.verticalScrollBar().valueChanged.connect(self.grow_if_near_edge)
+        self.horizontalScrollBar().valueChanged.connect(self.grow_if_near_edge)
+
+    def grow_if_near_edge(self, *_):
+        vs = self.verticalScrollBar()
+        hs = self.horizontalScrollBar()
+        if vs.maximum() and vs.value() >= vs.maximum() - 4 and self.rowCount() < MAX_VISIBLE_ROWS:
+            self.setRowCount(min(MAX_VISIBLE_ROWS, self.rowCount() + 200))
+        if hs.maximum() and hs.value() >= hs.maximum() - 2 and self.columnCount() < MAX_VISIBLE_COLS:
+            self.setColumnCount(min(MAX_VISIBLE_COLS, self.columnCount() + 26))
+            self.refresh_headers()
 
     def refresh_headers(self):
         self.setHorizontalHeaderLabels([col_name(i) for i in range(self.columnCount())])
@@ -68,7 +82,7 @@ class Sheet(QTableWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("海拓表格 1.1 — 未命名")
+        self.setWindowTitle("海拓表格 1.2 — 未命名")
         self.resize(1450, 850)
         self.path = None
         self.dirty = False
@@ -132,6 +146,10 @@ class MainWindow(QMainWindow):
         action("按选中列筛选", self.filter_column, None, data_menu)
         action("清除筛选", self.clear_filters, None, data_menu)
         action("自动调整列宽", self.fit_columns, None, format_menu)
+        action("设置当前列宽", self.set_column_width, None, format_menu)
+        action("设置当前行高", self.set_row_height, None, format_menu)
+        action("增加 200 行", self.add_rows, None, data_menu)
+        action("增加 26 列", self.add_columns, None, data_menu)
         action("字体", self.choose_font, None, format_menu)
         action("填充颜色", self.fill_color, None, format_menu)
         action("加粗", self.bold, "Ctrl+B", format_menu)
@@ -147,6 +165,8 @@ class MainWindow(QMainWindow):
             ("新增工作表", self.add_sheet), ("升序 A→Z", self.sort_ascending),
             ("降序 Z→A", self.sort_descending), ("筛选", self.filter_column),
             ("清除筛选", self.clear_filters), ("自动列宽", self.fit_columns),
+            ("列宽", self.set_column_width), ("行高", self.set_row_height),
+            ("增加行", self.add_rows), ("增加列", self.add_columns),
             ("去重", self.dedupe)
         ]:
             bar.addAction(label, func)
@@ -352,6 +372,31 @@ class MainWindow(QMainWindow):
         sheet.resizeColumnsToContents()
         self.statusBar().showMessage("已自动调整列宽")
 
+    def set_column_width(self):
+        sheet = self.sheet()
+        col = max(0, sheet.currentColumn())
+        size, ok = QInputDialog.getInt(self, "设置列宽", f"{col_name(col)} 列宽度（像素）", sheet.columnWidth(col), 25, 1500)
+        if ok:
+            sheet.setColumnWidth(col, size)
+            self.dirty = True
+
+    def set_row_height(self):
+        sheet = self.sheet()
+        row = max(0, sheet.currentRow())
+        size, ok = QInputDialog.getInt(self, "设置行高", f"第 {row + 1} 行高度（像素）", sheet.rowHeight(row), 18, 1000)
+        if ok:
+            sheet.setRowHeight(row, size)
+            self.dirty = True
+
+    def add_rows(self):
+        sheet = self.sheet()
+        sheet.setRowCount(min(MAX_VISIBLE_ROWS, sheet.rowCount() + 200))
+
+    def add_columns(self):
+        sheet = self.sheet()
+        sheet.setColumnCount(min(MAX_VISIBLE_COLS, sheet.columnCount() + 26))
+        sheet.refresh_headers()
+
     def select_column(self):
         self.sheet().selectColumn(max(0, self.sheet().currentColumn()))
 
@@ -395,7 +440,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.dirty = False
         self.add_sheet()
-        self.setWindowTitle("海拓表格 1.1 — 未命名")
+        self.setWindowTitle("海拓表格 1.2 — 未命名")
 
     def open_file(self):
         if not self.maybe_save():
@@ -449,7 +494,7 @@ class MainWindow(QMainWindow):
                 self.add_sheet()
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.1 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.2 — " + os.path.basename(path))
             self.statusBar().showMessage("已打开：" + path)
         except Exception as e:
             QMessageBox.critical(self, "打开失败", str(e))
@@ -497,7 +542,7 @@ class MainWindow(QMainWindow):
                         writer.writerow([sheet.text_at(r, c) for c in range(sheet.columnCount())])
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.1 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.2 — " + os.path.basename(path))
             self.statusBar().showMessage("已保存：" + path)
             return True
         except Exception as e:
