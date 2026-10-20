@@ -68,7 +68,7 @@ class Sheet(QTableWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("海拓表格 1.0 — 未命名")
+        self.setWindowTitle("海拓表格 1.1 — 未命名")
         self.resize(1450, 850)
         self.path = None
         self.dirty = False
@@ -115,6 +115,11 @@ class MainWindow(QMainWindow):
         action("插入行", self.insert_row, None, data_menu)
         action("删除行", self.delete_row, None, data_menu)
         action("按当前列去重", self.dedupe, None, data_menu)
+        action("按选中列升序排序", self.sort_ascending, None, data_menu)
+        action("按选中列降序排序", self.sort_descending, None, data_menu)
+        action("按选中列筛选", self.filter_column, None, data_menu)
+        action("清除筛选", self.clear_filters, None, data_menu)
+        action("自动调整列宽", self.fit_columns, None, format_menu)
         action("字体", self.choose_font, None, format_menu)
         action("填充颜色", self.fill_color, None, format_menu)
         action("加粗", self.bold, "Ctrl+B", format_menu)
@@ -127,7 +132,10 @@ class MainWindow(QMainWindow):
             ("复制", self.copy), ("粘贴", self.paste), ("加粗", self.bold),
             ("字体", self.choose_font), ("填充色", self.fill_color),
             ("插入行", self.insert_row), ("删除行", self.delete_row),
-            ("新增工作表", self.add_sheet), ("去重", self.dedupe)
+            ("新增工作表", self.add_sheet), ("升序 A→Z", self.sort_ascending),
+            ("降序 Z→A", self.sort_descending), ("筛选", self.filter_column),
+            ("清除筛选", self.clear_filters), ("自动列宽", self.fit_columns),
+            ("去重", self.dedupe)
         ]:
             bar.addAction(label, func)
         bar.addSeparator()
@@ -292,6 +300,49 @@ class MainWindow(QMainWindow):
                 return
         QMessageBox.information(self, "查找", "没有找到匹配的内容")
 
+    def sort_ascending(self):
+        self.sort_column(Qt.AscendingOrder)
+
+    def sort_descending(self):
+        self.sort_column(Qt.DescendingOrder)
+
+    def sort_column(self, direction):
+        sheet = self.sheet()
+        col = max(0, sheet.currentColumn())
+        sheet.setSortingEnabled(False)
+        sheet.sortItems(col, direction)
+        self.dirty = True
+        self.statusBar().showMessage(f"已按 {col_name(col)} 列排序")
+
+    def filter_column(self):
+        sheet = self.sheet()
+        col = max(0, sheet.currentColumn())
+        criterion, ok = QInputDialog.getText(self, "筛选", f"仅显示 {col_name(col)} 列包含以下文字的行（留空显示全部）：")
+        if not ok:
+            return
+        match = criterion.strip().casefold()
+        visible = 0
+        for row in range(sheet.rowCount()):
+            show = (not match) or match in sheet.text_at(row, col).casefold()
+            sheet.setRowHidden(row, not show)
+            if show:
+                visible += 1
+        self.statusBar().showMessage(f"筛选完成：显示 {visible} 行")
+
+    def clear_filters(self):
+        sheet = self.sheet()
+        for row in range(sheet.rowCount()):
+            sheet.setRowHidden(row, False)
+        self.statusBar().showMessage("已清除筛选")
+
+    def fit_columns(self):
+        sheet = self.sheet()
+        sheet.resizeColumnsToContents()
+        self.statusBar().showMessage("已自动调整列宽")
+
+    def select_column(self):
+        self.sheet().selectColumn(max(0, self.sheet().currentColumn()))
+
     def dedupe(self):
         sheet = self.sheet()
         col = max(0, sheet.currentColumn())
@@ -332,7 +383,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.dirty = False
         self.add_sheet()
-        self.setWindowTitle("海拓表格 1.0 — 未命名")
+        self.setWindowTitle("海拓表格 1.1 — 未命名")
 
     def open_file(self):
         if not self.maybe_save():
@@ -386,7 +437,7 @@ class MainWindow(QMainWindow):
                 self.add_sheet()
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.0 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.1 — " + os.path.basename(path))
             self.statusBar().showMessage("已打开：" + path)
         except Exception as e:
             QMessageBox.critical(self, "打开失败", str(e))
@@ -434,7 +485,7 @@ class MainWindow(QMainWindow):
                         writer.writerow([sheet.text_at(r, c) for c in range(sheet.columnCount())])
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.0 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.1 — " + os.path.basename(path))
             self.statusBar().showMessage("已保存：" + path)
             return True
         except Exception as e:
