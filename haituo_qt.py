@@ -299,16 +299,18 @@ class MainWindow(QMainWindow):
         if ans != QMessageBox.Yes:
             return
         seen = set()
-        deleted = 0
-        for r in range(sheet.rowCount() - 1, -1, -1):
+        duplicate_rows = []
+        for r in range(sheet.rowCount()):
             key = sheet.text_at(r, col).strip().casefold()
             if not key:
                 continue
             if key in seen:
-                sheet.removeRow(r)
-                deleted += 1
+                duplicate_rows.append(r)
             else:
                 seen.add(key)
+        for r in reversed(duplicate_rows):
+            sheet.removeRow(r)
+        deleted = len(duplicate_rows)
         QMessageBox.information(self, "完成", f"删除了 {deleted} 行。注意：去重以当前列为依据。")
         self.dirty = True
 
