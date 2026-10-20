@@ -88,7 +88,19 @@ class MainWindow(QMainWindow):
         self.make_ui()
         self.add_sheet()
         self.statusBar().showMessage("准备就绪 · 双击单元格编辑，Ctrl+C / Ctrl+V 复制粘贴")
-        self.setStyleSheet("QMainWindow { background: #f7f9f8; } QToolBar { background: #f4f7f5; border-bottom: 1px solid #d6ded8; spacing: 6px; padding: 6px; } QPushButton { padding: 5px; }")
+        self.setStyleSheet("""
+            QMainWindow { background: #eef3f0; }
+            QMenuBar { background: #174c37; color: white; padding: 8px; font-weight: 600; }
+            QMenuBar::item:selected { background: #2b7353; border-radius: 5px; }
+            QMenu { background: white; border: 1px solid #d6e2d9; padding: 6px; }
+            QMenu::item:selected { background: #dff1e5; color: #10482e; }
+            QToolBar { background: #fff; border-bottom: 1px solid #dce6de; spacing: 8px; padding: 13px; }
+            QToolBar QToolButton { padding: 9px 12px; color: #195238; border-radius: 7px; font-weight: 600; }
+            QToolBar QToolButton:hover { background: #e3f4e9; }
+            QLineEdit { background: white; padding: 8px; border: 1px solid #d6e2d9; border-radius: 6px; }
+            QTabWidget::pane { border: 1px solid #dce6de; background: white; }
+            QStatusBar { background: #f7faf8; color: #406c53; }
+        """)
 
     def make_ui(self):
         menu = self.menuBar()
