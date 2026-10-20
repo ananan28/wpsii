@@ -63,13 +63,17 @@ class Sheet(QTableWidget):
             self.refresh_headers()
 
     def used_size(self):
-        max_row = 0
-        max_col = 0
-        for (r, c) in ((i.row(), i.column()) for i in self.findItems("", Qt.MatchContains)):
-            if self.item(r, c) and self.item(r, c).text():
-                max_row = max(max_row, r + 1)
-                max_col = max(max_col, c + 1)
+        max_row = max_col = 0
+        for item in self.findItems("", Qt.MatchContains):
+            if item.text():
+                max_row = max(max_row, item.row() + 1)
+                max_col = max(max_col, item.column() + 1)
         return max_row, max_col
+
+    def populated_cells(self):
+        for item in self.findItems("", Qt.MatchContains):
+            if item.text():
+                yield item.row(), item.column(), item.text()
 
     def text_at(self, row, col):
         item = self.item(row, col)
@@ -83,7 +87,7 @@ class Sheet(QTableWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("海拓表格 1.3 — 未命名")
+        self.setWindowTitle("海拓表格 1.4 — 未命名")
         self.resize(1450, 850)
         self.path = None
         self.dirty = False
@@ -329,13 +333,11 @@ class MainWindow(QMainWindow):
         sheet = self.sheet()
         start = max(0, sheet.currentRow() * sheet.columnCount() + sheet.currentColumn() + 1)
         total = sheet.rowCount() * sheet.columnCount()
-        for delta in range(total):
-            k = (start + delta) % total
-            r, c = divmod(k, sheet.columnCount())
-            if needle.casefold() in sheet.text_at(r, c).casefold():
-                sheet.setCurrentCell(r, c)
-                sheet.scrollToItem(sheet.item(r, c))
-                return
+        hits = sorted((r * sheet.columnCount() + c, r, c) for r, c, value in sheet.populated_cells() if needle.casefold() in value.casefold())
+        for _, r, c in sorted(hits, key=lambda x: (x[0] < start, x[0])):
+            sheet.setCurrentCell(r, c)
+            sheet.scrollToItem(sheet.item(r, c))
+            return
         QMessageBox.information(self, "查找", "没有找到匹配的内容")
 
     def sort_ascending(self):
@@ -524,7 +526,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.dirty = False
         self.add_sheet()
-        self.setWindowTitle("海拓表格 1.3 — 未命名")
+        self.setWindowTitle("海拓表格 1.4 — 未命名")
 
     def open_file(self):
         if not self.maybe_save():
@@ -578,7 +580,7 @@ class MainWindow(QMainWindow):
                 self.add_sheet()
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.3 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.4 — " + os.path.basename(path))
             self.statusBar().showMessage("已打开：" + path)
         except Exception as e:
             QMessageBox.critical(self, "打开失败", str(e))
@@ -602,31 +604,42 @@ class MainWindow(QMainWindow):
         try:
             if path.lower().endswith(".xlsx"):
                 from openpyxl import Workbook
+                from openpyxl.styles import Font, PatternFill, Alignment
                 wb = Workbook()
                 wb.remove(wb.active)
                 for i in range(self.tabs.count()):
                     sheet = self.tabs.widget(i)
                     ws = wb.create_sheet(self.tabs.tabText(i))
-                    for r in range(sheet.rowCount()):
-                        values = [sheet.text_at(r, c) for c in range(sheet.columnCount())]
-                        if any(values):
-                            for c, value in enumerate(values):
-                                if value:
-                                    ws.cell(r + 1, c + 1, value)
+                    for row, col, value in sheet.populated_cells():
+                        cell = ws.cell(row + 1, col + 1, value)
+                        item = sheet.item(row, col)
+                        if item.font().bold():
+                            cell.font = Font(bold=True)
+                        bg = item.background().color()
+                        if bg.isValid() and bg.alpha() > 0 and bg.name() != "#ffffff":
+                            cell.fill = PatternFill(fill_type="solid", fgColor=bg.name().lstrip("#").upper())
+                    for col in range(min(sheet.columnCount(), 256)):
+                        from openpyxl.utils import get_column_letter
+                        if sheet.columnWidth(col) != 110:
+                            ws.column_dimensions[get_column_letter(col + 1)].width = max(3, sheet.columnWidth(col) / 7)
+                    for row in range(min(sheet.rowCount(), 5000)):
+                        if sheet.rowHeight(row) != 26:
+                            ws.row_dimensions[row + 1].height = sheet.rowHeight(row) * 0.75
                 wb.save(path)
             else:
                 sheet = self.sheet()
                 if self.tabs.count() > 1:
                     if QMessageBox.question(self, "CSV 仅支持单表", "CSV 只能保存当前工作表，是否继续？") != QMessageBox.Yes:
                         return False
-                delimiter = "\t" if path.lower().endswith(".tsv") else ","
+                delimiter = "\\t" if path.lower().endswith(".tsv") else ","
+                used_rows, used_cols = sheet.used_size()
                 with open(path, "w", encoding="utf-8-sig", newline="") as f:
                     writer = csv.writer(f, delimiter=delimiter)
-                    for r in range(sheet.rowCount()):
-                        writer.writerow([sheet.text_at(r, c) for c in range(sheet.columnCount())])
+                    for r in range(used_rows):
+                        writer.writerow([sheet.text_at(r, col) for col in range(used_cols)])
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.3 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.4 — " + os.path.basename(path))
             self.statusBar().showMessage("已保存：" + path)
             return True
         except Exception as e:
