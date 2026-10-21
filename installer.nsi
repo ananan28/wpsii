@@ -1,7 +1,7 @@
 Unicode True
 !include "MUI2.nsh"
 !define APPNAME "海拓表格"
-!define VERSION "1.4.0"
+!define VERSION "1.4.1"
 Name "${APPNAME} ${VERSION}"
 OutFile "HaituoTable_Setup_v${VERSION}_Win64.exe"
 InstallDir "$LOCALAPPDATA\Programs\HaituoTable"
