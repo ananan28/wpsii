@@ -65,14 +65,14 @@ class Sheet(QTableWidget):
     def used_size(self):
         max_row = max_col = 0
         for item in self.findItems("", Qt.MatchContains):
-            if item.text():
+            if item is not None and item.text():
                 max_row = max(max_row, item.row() + 1)
                 max_col = max(max_col, item.column() + 1)
         return max_row, max_col
 
     def populated_cells(self):
         for item in self.findItems("", Qt.MatchContains):
-            if item.text():
+            if item is not None and item.text():
                 yield item.row(), item.column(), item.text()
 
     def text_at(self, row, col):
@@ -87,7 +87,7 @@ class Sheet(QTableWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("海拓表格 1.4 — 未命名")
+        self.setWindowTitle("海拓表格 1.4.1 — 未命名")
         self.resize(1450, 850)
         self.path = None
         self.dirty = False
@@ -526,7 +526,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.dirty = False
         self.add_sheet()
-        self.setWindowTitle("海拓表格 1.4 — 未命名")
+        self.setWindowTitle("海拓表格 1.4.1 — 未命名")
 
     def open_file(self):
         if not self.maybe_save():
@@ -580,7 +580,7 @@ class MainWindow(QMainWindow):
                 self.add_sheet()
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.4 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.4.1 — " + os.path.basename(path))
             self.statusBar().showMessage("已打开：" + path)
         except Exception as e:
             QMessageBox.critical(self, "打开失败", str(e))
@@ -639,7 +639,7 @@ class MainWindow(QMainWindow):
                         writer.writerow([sheet.text_at(r, col) for col in range(used_cols)])
             self.path = path
             self.dirty = False
-            self.setWindowTitle("海拓表格 1.4 — " + os.path.basename(path))
+            self.setWindowTitle("海拓表格 1.4.1 — " + os.path.basename(path))
             self.statusBar().showMessage("已保存：" + path)
             return True
         except Exception as e:
